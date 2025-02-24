@@ -1,0 +1,78 @@
+QUERY Q1, "List of aircraft manufactured in period a-A by manufacturer M" AS
+SELECT aircraftid,manufacturer,model,capacity,year
+FROM Aircraft
+WHERE manufacturer=M and year>=y and year<=Y;
+
+QUERY Q2, "Detailed information about a passenger knowing his passport number" AS
+SELECT fullName,birthDate,nationality,sex
+FROM Passenger
+WHERE passport_num=PN;
+
+QUERY Q3, "List of flights of a given company in a given period and whose flight level is between l and L" AS
+SELECT id_number,date_dep,date_arr,time_dep,time_arr,level
+FROM Flight
+WHERE company=C and date_dep>=D1 and date_dep<=D2 and level>=l and level<=L ;
+
+QUERY Q4, "List of flights of a company on a given date with detailed departure and arrival information (flight id number, date/time/city/country of departure and arrival)" AS
+SELECT id_number,date_dep,time_dep,date_arr,time_arr,city_dep,country_dep,city_arr,country_arr
+FROM Flight
+WHERE company=C and date_dep>=D1 and date_dep<=D2;
+
+QUERY Q5, "List of aircraft used in flights during a period by a given company" AS
+SELECT id_number,date_dep,time_dep,date_arr,time_arr,level,aircraftid,model
+FROM Flight F JOIN Aircraft A ON F.aircraftid=A.aircraftid
+WHERE date_dep>=D1 and date_arr<=D2 and company=C;
+
+QUERY Q6, "List of flights of a period ensured by a given aircraft model" AS
+SELECT id_number,date_dep,time_dep,date_arr,time_arr,level,aircraftid,model
+FROM Flight F JOIN Aircraft AF ON F.aircraftid=AF.aircraftid
+WHERE date_dep>=D1 and date_arr<=D2 and model=M;
+
+QUERY Q7, "List of passengers registered on a given flight" AS
+SELECT P.passport_num,fullName,birthDate,nationality,sex
+FROM Passenger P JOIN book B ON B.passport_num=P.passport_num
+WHERE B.id_number=Fid;
+
+QUERY Q8, "List of passengers with a given nationality and sex who are registered on a given flight" AS
+SELECT P.passport_num,fullName,birthDate,nationality,sex
+FROM Passenger P JOIN book B ON B.passport_num=P.passport_num
+WHERE B.id_number=Fid and nationality=NT and sex=Sx;
+
+QUERY Q9, "List of geographic positions crossed by a given flight, sorted in descending chronological order" AS
+SELECT loc_date,loc_time,longitude,latitude
+FROM Localization L JOIN cross C ON C.id=L.id
+WHERE C.id_number=Fid
+ORDER BY loc_date DESC,loc_time DESC;
+
+QUERY Q10, "List of flights that entered an airspace (given latitude and longitude range). List sorted in ascending chronological ordeB.
+" AS
+SELECT C.id_number,loc_date,loc_time
+FROM Localization L JOIN cross C ON C.id=L.id
+WHERE longitude>=lg1 and longitude<=lg2 and latitude>=lt1 and latitude<=lt2;
+ORDER BY loc_date,loc_time;
+
+QUERY Q11, "Passport numbers of passengers who have a flight from a given city on a given date (flight number, date and time (departure), passport number)" AS
+SELECT F.id_number,date_dep,time_dep,passport_num
+FROM Flight F JOIN book B ON B.id_number=F.id_number
+WHERE  city_dep=CT and country_dep=CNT and date_dep=DD;
+
+QUERY Q12, "List of passengers registered on flights of a given date, sorted by flight id number, then by nationality then by full name" AS
+SELECT F.id_number,date_dep,time_dep,date_arr,time_arr,nationality,fullName
+FROM Flight F JOIN book B JOIN Passenger P ON F.id_number=B.id_number and B.passport_num=P.passport_num
+WHERE date_dep>=D1 and date_dep<=D2
+ORDER BY F.id_number,nationality,fullName;
+
+QUERY Q13, "detailed information of passengers who have flights from a given city on a given date (flight id number, date and time (departure), passport number, full name, date of birth, nationality and sex). The list should be sorted respectively by flight id number, then by nationality and passport number" AS
+SELECT F.id_number,date_dep,time_dep,passport_num,fullName,birthDate,nationality,sex
+FROM Flight F JOIN book B JOIN Passenger V ON 
+B.id_number=F.id_number and B.passport_num=P.passport_num
+WHERE city_dep=CT and country_dep=CNT and date_dep=D
+ORDER BY F.id_number,nationality,P.passport_num;
+
+QUERY Q14, "List of aircraft (number and model) that will take off on a given date with the list of passengers (name, nationality and passport number) who will use them. This list must be sorted by aircraft id, then by nationality then by passport number" AS
+SELECT AF.aircraftid,model,nationality,P.passport_num,fullName
+FROM Aircraft AF JOIN Flight F JOIN book B JOIN Passenger P ON 
+     F.aircraftid=AF.aircraftid and F.id_number=B.id_number and B.passport_num=P.passport_num
+WHERE date_dep=D
+ORDER BY AF.aircraftid,nationality,P.passport_num;
+
