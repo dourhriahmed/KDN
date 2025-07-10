@@ -1,10 +1,3 @@
-Entity Passenger{
-passport_num String id,
-fullName String,
-birthDate Date,
-nationality String,
-sex String
-}
 Entity Flight{
 id_number Integer id,
 date_dep Date,
@@ -16,34 +9,32 @@ country_dep String,
 city_arr String,
 country_arr String,
 company String,
-level Integer
+level Integer,
+ref Passenger [1..*] passengers,
+ref Aircraft [1] aircraft,
+ref Localization [*] positions
 }
 Entity Aircraft{
 aircraftid Integer id,
 manufacturer String,
 model String,
 capacity Integer,
-year Integer
+year Integer,
+ref Flight [*] flights
+}
+Entity Passenger{
+passport_num String id,
+fullName String,
+birthDate Date,
+nationality String,
+sex String,
+ref Flight [1..*] flights
 }
 Entity Localization{
 id Integer id,
 loc_date Date,
 loc_time Time,
 longitude Float,
-latitude Float
-}
-Relationship book{
-Entity Passenger,Flight
-Cardinality <1-n>,<1-n>
-Attribute None
-}
-Relationship cross{
-Entity Flight,Localization
-Cardinality <0-n>,<1-n>
-Attribute None
-}
-Relationship ensure{
-Entity Flight,Aircraft
-Cardinality <1-1>,<0-n>
-Attribute None
+latitude Float,
+ref Flight [*] flights
 }
