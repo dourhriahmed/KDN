@@ -1,0 +1,165 @@
+import tkinter as tk
+from tkinter import scrolledtext, messagebox, ttk
+from functools import partial
+
+# Global shared data
+entity_entries = []
+query_entries = []
+
+# Phase 1: Entity input window
+def launch_entity_window():
+    entity_window = tk.Toplevel(root)
+    entity_window.title("Spécification des Entités")
+    entity_window.geometry("600x400")
+
+    def collect_entity_fields():
+        try:
+            m = int(entry_entities.get())
+            if m <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Erreur", "Veuillez entrer un nombre valide d'entités.")
+            return
+
+        for widget in frame_entity_inputs.winfo_children():
+            widget.destroy()
+        entity_entries.clear()
+
+        for i in range(m):
+            label = tk.Label(frame_entity_inputs, text=f"Entité {i+1}:", font=("Arial", 12))
+            label.pack()
+            entry = tk.Entry(frame_entity_inputs, font=("Arial", 12))
+            entry.pack(pady=5)
+            entity_entries.append(entry)
+
+        btn_continue.pack(pady=10)
+
+    def proceed_to_queries():
+        entity_window.destroy()
+        launch_query_window()
+
+    label = tk.Label(entity_window, text="Nombre d'entités:", font=("Arial", 12))
+    label.pack(pady=10)
+
+    entry_entities = tk.Entry(entity_window, width=5)
+    entry_entities.pack()
+
+    btn_collect = tk.Button(entity_window, text="Valider", command=collect_entity_fields)
+    btn_collect.pack(pady=10)
+
+    frame_entity_inputs = tk.Frame(entity_window)
+    frame_entity_inputs.pack(pady=10)
+
+    btn_continue = tk.Button(entity_window, text="Continuer vers les Requêtes", command=proceed_to_queries, font=("Arial", 12))
+
+# Phase 2: Query input window
+def launch_query_window():
+    query_window = tk.Toplevel(root)
+    query_window.title("Spécification des Requêtes")
+    query_window.geometry("900x600")
+
+    def collect_query_fields():
+        try:
+            nbreq = int(entry_nbreq.get())
+            if nbreq <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Erreur", "Veuillez entrer un nombre valide de requêtes.")
+            return
+
+        for widget in frame_queries.winfo_children():
+            widget.destroy()
+        query_entries.clear()
+
+        for i in range(nbreq):
+            frame = tk.Frame(frame_queries)
+            frame.grid(row=i//2, column=i%2, padx=10, pady=5, sticky="w")
+            label = tk.Label(frame, text=f"Requête {i+1}:", font=("Arial", 12))
+            label.pack()
+            query_entry = scrolledtext.ScrolledText(frame, height=3, width=40)
+            query_entry.pack()
+            query_entries.append(query_entry)
+
+        btn_generate_schema.pack(pady=10)
+
+    def generate_nosql_schema():
+        queries = {i+1: query_entries[i].get("1.0", tk.END).strip() for i in range(len(query_entries))}
+        if not all(queries.values()):
+            messagebox.showerror("Erreur", "Veuillez remplir toutes les requêtes avant de générer le schéma.")
+            return
+
+        global DD
+        DD = dataDictionary(queries)
+        silhouette_scores = {}
+        best_k = 2
+        best_score = silhouette_index_global(queries, 2)
+        silhouette_scores[2] = best_score
+        for k in range(3, len(queries)):
+            score = silhouette_index_global(queries, k)
+            silhouette_scores[k] = score
+            if score > best_score:
+                best_score = score
+                best_k = k
+
+        schema = kmeans(queries, best_k)
+        display_schema_in_new_window(schema, silhouette_scores, best_k)
+
+    label_nbreq = tk.Label(query_window, text="Nombre de requêtes:", font=("Arial", 12))
+    label_nbreq.pack(pady=10)
+
+    entry_nbreq = tk.Entry(query_window, width=5)
+    entry_nbreq.pack()
+
+    btn_confirm_nbreq = tk.Button(query_window, text="Confirmer", command=collect_query_fields, font=("Arial", 12))
+    btn_confirm_nbreq.pack(pady=10)
+
+    frame_queries = tk.Frame(query_window)
+    frame_queries.pack(pady=10)
+
+    btn_generate_schema = tk.Button(query_window, text="Générer un Schéma NoSQL Optimal", command=generate_nosql_schema, font=("Arial", 12, "bold"))
+
+# Résultat dans une nouvelle fenêtre
+
+def display_schema(schema, silhouette_scores, best_k, parent):
+    canvas = tk.Canvas(parent)
+    scrollbar = tk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+    scroll_frame = tk.Frame(canvas)
+
+    scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+    canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    silhouette_label = tk.Label(scroll_frame, text="Indice de silhouette par valeur de k:", font=("Arial", 14, "bold"))
+    silhouette_label.pack()
+
+    for k, score in silhouette_scores.items():
+        color = "red" if k == best_k else "black"
+        font_style = ("Arial", 12, "bold") if k == best_k else ("Arial", 12)
+        tk.Label(scroll_frame, text=f"k={k}: {score:.3f}", fg=color, font=font_style).pack()
+
+    for i, collection in schema.items():
+        col_frame = tk.LabelFrame(scroll_frame, text=f"Collection {i}", padx=10, pady=10, font=("Arial", 14, "bold"))
+        col_frame.pack(padx=10, pady=10, fill=tk.X)
+        attrs_label = tk.Label(col_frame, text=f"Attributs: {', '.join(collection['hset'])}", font=("Arial", 12))
+        attrs_label.pack(anchor="w")
+        queries_label = tk.Label(col_frame, text=f"Requêtes supportées: {', '.join(map(str, collection['queries']))}", font=("Arial", 12))
+        queries_label.pack(anchor="w")
+
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+
+def display_schema_in_new_window(schema, silhouette_scores, best_k):
+    new_window = tk.Toplevel(root)
+    new_window.title("Résultat du Schéma NoSQL")
+    new_window.geometry("900x600")
+    display_schema(schema, silhouette_scores, best_k, new_window)
+
+# Fenêtre principale pour démarrer
+root = tk.Tk()
+root.title("AI3D - Schéma NoSQL Guidé par IA")
+root.geometry("600x300")
+
+btn_start = tk.Button(root, text="Commencer la Conception", command=launch_entity_window, font=("Arial", 14, "bold"))
+btn_start.pack(expand=True)
+
+root.mainloop()
