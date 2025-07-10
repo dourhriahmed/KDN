@@ -1,4 +1,4 @@
-QUERY Q1, "List of aircraft manufactured in period a-A by manufacturer M" AS
+QUERY Q1, "List of aircraft manufactured in period y-Y by manufacturer M. the liste is sorted by year" AS
 SELECT aircraftid,manufacturer,model,capacity,year
 FROM Aircraft
 WHERE manufacturer=%M% and year>=%y% and year<=%Y%
@@ -10,77 +10,77 @@ FROM Passenger
 WHERE passport_num=%PN%;
 
 QUERY Q3, "List of flights of a given company in a given period and whose flight level is between l and L" AS
-SELECT id_number,date_dep,date_arr,time_dep,time_arr,level
+SELECT id_number,date_dep,time_dep,date_arr,time_arr,country_dep,city_dep,country_arr,city_arr,level
 FROM Flight
 WHERE company=%C% and date_dep>=%D1% and date_dep<=%D2% and level>=%l% and level<=%L%;
 
 QUERY Q4, "List of flights of a company on a given date with detailed departure and arrival information (flight id number, date/time/city/country of departure and arrival)" AS
 SELECT id_number,date_dep,time_dep,date_arr,time_arr,city_dep,country_dep,city_arr,country_arr
 FROM Flight
-WHERE company=%C% and date_dep>=%D1% and date_dep<=%D2%;
+WHERE company=%C% and date_dep=%D%;
 
-QUERY Q5, "List of aircraft used in flights during a period by a given company" AS
-SELECT id_number,date_dep,time_dep,date_arr,time_arr,level,aircraftid,model
-FROM Flight F 
-INCLUDE F.aircraft
-WHERE date_dep>=%D1% and date_arr<=%D2% and company=%C%;
+QUERY Q5, "List of aircraft used in flights during a period by a given company ((aircraft id and model, flight id and departure date)" AS
+SELECT id_number,date_dep,aircraftid,model
+FROM Flight 
+INCLUDE Flight.aircraft
+WHERE date_dep>=%D1% and date_dep<=%D2% and company=%C%;
 
 QUERY Q6, "List of flights of a period ensured by a given aircraft model" AS
-SELECT id_number,date_dep,time_dep,date_arr,time_arr,level,aircraftid,model
-FROM Flight F 
-INCLUDE F.aircraft
-WHERE date_dep>=%D1% and date_arr<=%D2% and model=%M%;
+SELECT id_number,date_dep,time_dep,date_arr,time_arr,level
+FROM Flight 
+INCLUDE Flight.aircraft
+WHERE date_dep>=%D1% and date_dep<=%D2% and model=%M%;
 
 QUERY Q7, "List of passengers registered on a given flight" AS
-SELECT P.passport_num,fullName,birthDate,nationality,sex
-FROM Flight F
-INCLUDE F.passengers
-WHERE id_number=%Flightid%;
+SELECT passport_num,fullName,birthDate,nationality,sex
+FROM Flight
+INCLUDE Flight.passengers
+WHERE id_number=%N%;
 
 QUERY Q8, "List of passengers with a given nationality and sex who are registered on a given flight" AS
-SELECT passport_num,fullName,birthDate,nationality,sex
-FROM Passenger P
-INCLUDE P.flights
-WHERE id_number=%Flightid% and nationality=%NT% and sex=%Sx%;
+SELECT passport_num,fullName,birthDate
+FROM Passenger
+INCLUDE Passenger.flights
+WHERE id_number=%N% and nationality=%NT% and sex=%Sx%;
 
-QUERY Q9, "List of geographic positions crossed by a given flight, sorted in descending chronological order" AS
-SELECT loc_date,loc_time,longitude,latitude
-FROM Flight F
-INCLUDE F.positions
-WHERE id_number=%Flightid%
+QUERY Q9, "List of positions crossed by a given flight, sorted in descending chronological order" AS
+SELECT longitude,latitude,loc_date,loc_time
+FROM Flight
+INCLUDE Flight.positions
+WHERE id_number=%N%
 ORDER BY loc_date DESC,loc_time DESC;
 
 QUERY Q10, "List of flights that entered an airspace (given latitude and longitude range). List sorted in ascending chronological order.
 " AS
 SELECT id_number,loc_date,loc_time
-FROM Localization L 
-INCLUDE l.flights
+FROM Localization
+INCLUDE Localization.flights
 WHERE longitude>=%lg1% and longitude<=%lg2% and latitude>=%lt1% and latitude<=%lt2%;
 ORDER BY loc_date,loc_time;
 
 QUERY Q11, "Passport numbers of passengers who have a flight from a given city on a given date (flight number, date and time (departure), passport number)" AS
-SELECT F.id_number,date_dep,time_dep,passport_num
-FROM Flight F 
-INCLUDE F.passengers
+SELECT id_number,date_dep,time_dep,passport_num
+FROM Flight
+INCLUDE Flight.passengers
 WHERE  city_dep=%CT% and country_dep=%CNT% and date_dep=%DD%;
 
 QUERY Q12, "List of passengers registered on flights of a given date, sorted by flight id number, then by nationality then by full name" AS
-SELECT id_number,date_dep,time_dep,date_arr,time_arr,nationality,fullName
-FROM Flight F 
-INCLUDE F.passengers
-WHERE date_dep>=%D1% and date_dep<=%D2%
+SELECT id_number,date_dep,time_dep,date_arr,time_arr,nationality,fullName,passport_num
+FROM Flight 
+INCLUDE Flight.passengers
+WHERE date_dep>=%D%
 ORDER BY id_number,nationality,fullName;
 
 QUERY Q13, "detailed information of passengers who have flights from a given city on a given date (flight id number, date and time (departure), passport number, full name, date of birth, nationality and sex). The list should be sorted respectively by flight id number, then by nationality and passport number" AS
 SELECT id_number,date_dep,time_dep,passport_num,fullName,birthDate,nationality,sex
-FROM Flight F 
-INCLUDE F.passengers
+FROM Flight 
+INCLUDE Flight.passengers
 WHERE city_dep=%CT% and country_dep=%CNT% and date_dep=%D%
 ORDER BY id_number,nationality,P.passport_num;
 
-QUERY Q14, "List of aircraft (number and model) that will take off on a given date with the list of passengers (name, nationality and passport number) who will use them. This list must be sorted by aircraft id, then by nationality then by passport number" AS
-SELECT aircraftid,model,nationality,passport_num,fullName
-FROM Flight F
-INCLUDE F.aircraft,F.passengers
+QUERY Q14, "List of aircraft (id number and model) that will take off on a given date with the list of passengers (name, nationality and passport number) who will use them. This list must be sorted by aircraft id, then by nationality then by passport number" AS
+SELECT aircraftid,model,fullName,nationality,passport_num
+FROM Flight
+INCLUDE Flight.aircraft,Flight.passengers
 WHERE date_dep=%D%
 ORDER BY aircraftid,nationality,passport_num;
