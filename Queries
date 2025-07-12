@@ -55,7 +55,7 @@ QUERY Q10, "List of flights that entered an airspace (given latitude and longitu
 SELECT id_number,loc_date,loc_time
 FROM Localization
 INCLUDE Localization.flights
-WHERE longitude>=%lg1% and longitude<=%lg2% and latitude>=%lt1% and latitude<=%lt2%;
+WHERE longitude>=%lg1% and longitude<=%lg2% and latitude>=%lt1% and latitude<=%lt2%
 ORDER BY loc_date,loc_time;
 
 QUERY Q11, "Passport numbers of passengers who have a flight from a given city on a given date (flight number, date and time (departure), passport number)" AS
