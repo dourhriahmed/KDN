@@ -1,165 +1,347 @@
+import random as rd
+import numpy as np
+import re
+query1="SELECT aircraftid,manufacturer,model,capacity,year FROM Aircraft WHERE manufacturer=%M% and year>=%y% and year<=%Y% ORDER BY year ASC;"
+
+query2="SELECT fullName,birthDate,nationality,sex FROM Passenger WHERE passport_num=%PN%;"
+
+query3="SELECT id_number,date_dep,time_dep,date_arr,time_arr,country_dep,city_dep,country_arr,city_arr,level FROM Flight WHERE company=%C% and date_dep>=%D1% and date_dep<=%D2% and level>=%l% and level<=%L%;"
+
+query4="SELECT id_number,date_dep,time_dep,date_arr,time_arr,city_dep,country_dep,city_arr,country_arr FROM Flight WHERE company=%C% and date_dep=%D%;"
+
+query5="SELECT id_number,date_dep,aircraftid,model FROM Flight INCLUDE Flight.aircraft WHERE date_dep>=%D1% and date_dep<=%D2% and company=%C%;"
+
+query6="SELECT id_number,date_dep,time_dep,date_arr,time_arr,level FROM Flight INCLUDE Flight.aircraft WHERE date_dep>=%D1% and date_dep<=%D2% and model=%M%;"
+
+query7="SELECT passport_num,fullName,birthDate,nationality,sex FROM Flight INCLUDE Flight.passengers WHERE id_number=%N%;"
+
+query8="SELECT passport_num,fullName,birthDate FROM Passenger INCLUDE Passenger.flights WHERE id_number=%N% and nationality=%NT% and sex=%Sx%;"
+
+query9="SELECT longitude,latitude,loc_date,loc_time FROM Flight INCLUDE Flight.positions WHERE id_number=%N% ORDER BY loc_date DESC,loc_time DESC;"
+
+query10="SELECT id_number,loc_date,loc_time FROM Localization INCLUDE Localization.flights WHERE longitude>=%lg1% and longitude<=%lg2% and latitude>=%lt1% and latitude<=%lt2% ORDER BY loc_date,loc_time;"
+
+query11="SELECT id_number,date_dep,time_dep,passport_num FROM Flight INCLUDE Flight.passengers WHERE  city_dep=%CT% and country_dep=%CNT% and date_dep=%DD%;"
+
+query12="SELECT id_number,date_dep,time_dep,date_arr,time_arr,nationality,fullName,passport_num FROM Flight INCLUDE Flight.passengers WHERE date_dep>=%D% ORDER BY id_number,nationality,fullName;"
+
+query13="SELECT id_number,date_dep,time_dep,passport_num,fullName,birthDate,nationality,sex FROM Flight INCLUDE Flight.passengers WHERE city_dep=%CT% and country_dep=%CNT% and date_dep=%D% ORDER BY id_number,nationality,P.passport_num;"
+
+query14="SELECT aircraftid,model,fullName,nationality,passport_num FROM Flight INCLUDE Flight.aircraft,Flight.passengers WHERE date_dep=%D% ORDER BY aircraftid,nationality,passport_num;"
+
+queries={i:eval("query"+str(i)) for i in range(1,15)}
+
+def getAttribs(query):
+    query=query.replace("DESC","")
+    query=query.replace("ASC","")
+    query=query.replace("\n"," ")
+    select_pattern = r"select (.*?) from"
+    where_pattern = r"where (.*?) order by|where (.*?)(;|$)"
+    order_by_pattern = r"order by (.*?)(;|$)"
+
+    attributes = set()
+    alias_mapping = {}
+
+    # Extract attributes from SELECT clause
+    select_match = re.search(select_pattern, query, re.IGNORECASE)
+    if select_match:
+        select_clause = select_match.group(1)
+
+        # Handle aliasing (AS keyword)
+        for part in select_clause.split(','):
+            part = part.strip()
+            match_alias = re.match(r"(.+?)\s+as\s+(\w+)", part, re.IGNORECASE)
+            if match_alias:
+                original_attr, alias = match_alias.groups()
+                original_attr = original_attr.split('.')[-1].strip()  # Remove table prefix if present
+                alias_mapping[original_attr] = alias.strip()
+                attributes.add(alias.strip())  # Use alias as the stored attribute
+            else:
+                attributes.add(part.split('.')[-1].strip())  # Remove table prefix if present
+
+    # Extract attributes from WHERE clause
+    where_match = re.search(where_pattern, query, re.IGNORECASE)
+    if where_match:
+        where_clause = where_match.group(1) or where_match.group(2)
+        if where_clause:
+            for word in re.findall(r"\b\w+\b(?=\s*[=<>!])", where_clause):
+                attributes.add(word.split('.')[-1])  # Remove table prefix
+
+    # Extract attributes from ORDER BY clause
+    order_by_match = re.search(order_by_pattern, query, re.IGNORECASE)
+    if order_by_match:
+        for attr in order_by_match.group(1).split(','):
+            attributes.add(attr.strip().split('.')[-1])  # Remove table prefix
+
+    LAQ = sorted(attributes)
+    return LAQ
+
+def dataDictionary(Q):
+    DD=set()
+    for k in Q.keys():
+        query=Q[k]
+        DD.update(getAttribs(query))
+    LL=list(DD)
+    LL.sort()
+    return LL
+
+DD=dataDictionary(queries)
+
+def binaryVector(query,DD):
+    A=getAttribs(query)
+    V=[0]*len(DD)
+    for a in A:
+        j=DD.index(a)
+        V[j]=1
+    return V
+
+def randomChoice(Q,k):
+    n=len(Q)
+    DD=dataDictionary(Q)
+    C=[]
+    for i in range(k):
+        C.append(i+1)
+        # x=rd.randint(1,n)
+        # while x in C:
+        #     x=rd.randint(1,n)
+        # C.append(x)
+    return {i+1:binaryVector(Q[C[i]],DD) for i in range(len(C))}
+
+def jaccard_dist(Q1, Q2):
+    # Compute the intersection and union of the binary vectors related to Q1 and Q2 queries
+    T1,T2=np.array(Q1),np.array(Q2)
+    I=T1*T2
+    U=T1+T2
+    intersection = len([e for e in I if e!=0])
+    union = len([e for e in U if e!=0])
+    # Compute the Jaccard distance
+    return 1 - (intersection / union)
+
+def centroide(Q, I):
+    n=len(I)
+    threshold=1/3
+    if not I:  # Check if I is empty
+        DD = dataDictionary(Q)
+        return [0] * len(DD)  # Return a default centroid of zeros
+
+    M = []
+    DD = dataDictionary(Q)
+    for k in I:
+        M.append(binaryVector(Q[k], DD))
+    M = np.array(M)
+
+    # Ensure M is two-dimensional
+    if len(M.shape) == 1:
+        M = M.reshape(1, -1)
+
+    C = [(M[:, j]).mean() for j in range(len(DD))]
+    for i in range(len(C)):
+        if C[i]>threshold:
+            C[i] = 1
+        else:
+            C[i] = 0
+    return C
+
+def plus_proche(query,C):
+    distmin=float("inf")
+    for key in C.keys():
+        if jaccard_dist(query,C[key])<distmin:
+            distmin=jaccard_dist(query,C[key])
+            pos=key
+    return pos
+def equals(dict1,dict2):
+    def isSubDict(d1,d2):
+        for k in d1:
+            if k not in d2:
+                return False
+            elif d1[k]!=d2[k]:
+                return False
+        return True
+    return isSubDict(dict1,dict2) and isSubDict(dict2,dict1)
+
+def indices(CLS,val):
+    return [k for k in CLS.keys() if CLS[k]==val]
+
+def vector_to_hset(B,DD):
+    return [DD[i] for i in range(len(B)) if B[i]!=0]
+
+def kmeans(Q,k):
+    m=len(Q)
+    DD=dataDictionary(Q)
+    C=randomChoice(Q,k)
+    CLS=dict()
+    for q in Q.keys():
+        pp=plus_proche(binaryVector(Q[q],DD),C)
+        CLS[q]=pp
+    while True:
+        CC={i:centroide(Q,indices(CLS,i)) for i in range(1,k+1)}
+        if equals(C,CC):
+            break
+        else:
+            C=CC.copy()
+            CLS=dict()
+            for q in Q.keys():
+                pp=plus_proche(binaryVector(Q[q],DD),C)
+                CLS[q]=pp
+    hset=dict()
+    for i in range(1,k+1):
+        I=indices(CLS,i)
+        hset[i]={"queries":I,"hset":vector_to_hset(C[i],DD)}
+    return hset
+def average_jaccard_dist(q,Q,I):
+    #return the average jaccard distance between the query q and the queries of I index of the query model Q
+    d=0;nb=0
+    for i in I:
+        if i!=q:
+            d+=jaccard_dist(binaryVector(Q[q],DD),binaryVector(Q[i],DD))
+            nb+=1
+    return 0 if nb==0 else d/nb
+def nearest_cluster(q,Q,cluster):
+    dmin=float("inf")
+    for k in cluster.keys():
+        I=cluster[k]['queries']
+        if q not in I and average_jaccard_dist(q,Q,I)<dmin:
+            dmin=average_jaccard_dist(q,Q,I)
+            index=k
+    return index
+def silhouette_index_global(Q,k):
+    cluster=kmeans(Q,k)
+    def silhouette_index_query(q):
+        #identify the own cluster
+        for c in cluster.keys():
+            if q in cluster[c]['queries']:
+                owner=c
+                break
+        #identify the nearest cluster
+        nearest=nearest_cluster(q,Q,cluster)
+        b=average_jaccard_dist(q,Q,cluster[nearest]['queries'])
+        a=average_jaccard_dist(q,Q,cluster[owner]['queries'])
+        return (b-a)/max(a,b) if max(a,b)>0 else 0
+    s=0
+    for q in Q.keys():
+        s+=silhouette_index_query(q)
+    return s/len(Q)
+def optimalSchema(Q):
+    M = silhouette_index_global(Q, 2)
+    optimal_k = 2
+    scores = {2: M}
+    for k in range(3, len(Q)):
+        sil_k = silhouette_index_global(Q, k)
+        scores[k] = sil_k
+        if M < sil_k:
+            M = sil_k
+            optimal_k = k
+    return M, optimal_k, scores
 import tkinter as tk
-from tkinter import scrolledtext, messagebox, ttk
-from functools import partial
+from tkinter import messagebox, scrolledtext, Toplevel
 
-# Global shared data
-entity_entries = []
-query_entries = []
-
-# Phase 1: Entity input window
-def launch_entity_window():
-    entity_window = tk.Toplevel(root)
-    entity_window.title("Spécification des Entités")
-    entity_window.geometry("600x400")
-
-    def collect_entity_fields():
+def create_input_window():
+    def generate_fields():
         try:
-            m = int(entry_entities.get())
-            if m <= 0:
+            n = int(entry.get())
+            if n <= 0:
                 raise ValueError
-        except ValueError:
-            messagebox.showerror("Erreur", "Veuillez entrer un nombre valide d'entités.")
+        except:
+            messagebox.showerror("Error", "Enter a positive integer.")
             return
 
-        for widget in frame_entity_inputs.winfo_children():
+        for widget in canvas_frame.winfo_children():
             widget.destroy()
-        entity_entries.clear()
+        global textboxes
+        textboxes = []
 
-        for i in range(m):
-            label = tk.Label(frame_entity_inputs, text=f"Entité {i+1}:", font=("Arial", 12))
-            label.pack()
-            entry = tk.Entry(frame_entity_inputs, font=("Arial", 12))
-            entry.pack(pady=5)
-            entity_entries.append(entry)
+        rows = (n + 1) // 2
+        for i in range(n):
+            col = i % 2
+            row = i // 2
 
-        btn_continue.pack(pady=10)
+            label = tk.Label(canvas_frame, text=f"Query {i+1}")
+            label.grid(row=row*2, column=col, sticky='w', padx=10, pady=(10, 0))
 
-    def proceed_to_queries():
-        entity_window.destroy()
-        launch_query_window()
+            txt = tk.Text(canvas_frame, height=3, width=60, wrap='word')
+            txt.grid(row=row*2+1, column=col, padx=10, pady=(0, 10))
+            textboxes.append(txt)
 
-    label = tk.Label(entity_window, text="Nombre d'entités:", font=("Arial", 12))
-    label.pack(pady=10)
+        # Add button centered below the last row
+        button_row = (rows)*2
+        btn = tk.Button(canvas_frame, text="Generate Document-Oriented Schema", command=on_submit)
+        btn.grid(row=button_row, column=0, columnspan=2, pady=20)
 
-    entry_entities = tk.Entry(entity_window, width=5)
-    entry_entities.pack()
+        canvas_frame.update_idletasks()
+        canvas.config(scrollregion=canvas.bbox("all"))
 
-    btn_collect = tk.Button(entity_window, text="Valider", command=collect_entity_fields)
-    btn_collect.pack(pady=10)
+    def on_submit():
+        Q = {}
+        for i, txt in enumerate(textboxes):
+            content = txt.get("1.0", tk.END).strip().replace("\n", " ")
+            if not content.lower().startswith("select"):
+                messagebox.showerror("Error", f"Query {i+1} must start with SELECT.")
+                return
+            Q[i+1] = content
+        show_output_window(Q)
 
-    frame_entity_inputs = tk.Frame(entity_window)
-    frame_entity_inputs.pack(pady=10)
+    root = tk.Tk()
+    root.title("KDNApp - Query Input")
 
-    btn_continue = tk.Button(entity_window, text="Continuer vers les Requêtes", command=proceed_to_queries, font=("Arial", 12))
+    tk.Label(root, text="Enter number of queries:").pack()
+    entry = tk.Entry(root)
+    entry.pack()
 
-# Phase 2: Query input window
-def launch_query_window():
-    query_window = tk.Toplevel(root)
-    query_window.title("Spécification des Requêtes")
-    query_window.geometry("900x600")
+    tk.Button(root, text="Create Input Fields", command=generate_fields).pack(pady=5)
 
-    def collect_query_fields():
-        try:
-            nbreq = int(entry_nbreq.get())
-            if nbreq <= 0:
-                raise ValueError
-        except ValueError:
-            messagebox.showerror("Erreur", "Veuillez entrer un nombre valide de requêtes.")
-            return
-
-        for widget in frame_queries.winfo_children():
-            widget.destroy()
-        query_entries.clear()
-
-        for i in range(nbreq):
-            frame = tk.Frame(frame_queries)
-            frame.grid(row=i//2, column=i%2, padx=10, pady=5, sticky="w")
-            label = tk.Label(frame, text=f"Requête {i+1}:", font=("Arial", 12))
-            label.pack()
-            query_entry = scrolledtext.ScrolledText(frame, height=3, width=40)
-            query_entry.pack()
-            query_entries.append(query_entry)
-
-        btn_generate_schema.pack(pady=10)
-
-    def generate_nosql_schema():
-        queries = {i+1: query_entries[i].get("1.0", tk.END).strip() for i in range(len(query_entries))}
-        if not all(queries.values()):
-            messagebox.showerror("Erreur", "Veuillez remplir toutes les requêtes avant de générer le schéma.")
-            return
-
-        global DD
-        DD = dataDictionary(queries)
-        silhouette_scores = {}
-        best_k = 2
-        best_score = silhouette_index_global(queries, 2)
-        silhouette_scores[2] = best_score
-        for k in range(3, len(queries)):
-            score = silhouette_index_global(queries, k)
-            silhouette_scores[k] = score
-            if score > best_score:
-                best_score = score
-                best_k = k
-
-        schema = kmeans(queries, best_k)
-        display_schema_in_new_window(schema, silhouette_scores, best_k)
-
-    label_nbreq = tk.Label(query_window, text="Nombre de requêtes:", font=("Arial", 12))
-    label_nbreq.pack(pady=10)
-
-    entry_nbreq = tk.Entry(query_window, width=5)
-    entry_nbreq.pack()
-
-    btn_confirm_nbreq = tk.Button(query_window, text="Confirmer", command=collect_query_fields, font=("Arial", 12))
-    btn_confirm_nbreq.pack(pady=10)
-
-    frame_queries = tk.Frame(query_window)
-    frame_queries.pack(pady=10)
-
-    btn_generate_schema = tk.Button(query_window, text="Générer un Schéma NoSQL Optimal", command=generate_nosql_schema, font=("Arial", 12, "bold"))
-
-# Résultat dans une nouvelle fenêtre
-
-def display_schema(schema, silhouette_scores, best_k, parent):
-    canvas = tk.Canvas(parent)
-    scrollbar = tk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-    scroll_frame = tk.Frame(canvas)
-
-    scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-    canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+    canvas = tk.Canvas(root, height=500)
+    scrollbar = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
     canvas.configure(yscrollcommand=scrollbar.set)
-
-    silhouette_label = tk.Label(scroll_frame, text="Indice de silhouette par valeur de k:", font=("Arial", 14, "bold"))
-    silhouette_label.pack()
-
-    for k, score in silhouette_scores.items():
-        color = "red" if k == best_k else "black"
-        font_style = ("Arial", 12, "bold") if k == best_k else ("Arial", 12)
-        tk.Label(scroll_frame, text=f"k={k}: {score:.3f}", fg=color, font=font_style).pack()
-
-    for i, collection in schema.items():
-        col_frame = tk.LabelFrame(scroll_frame, text=f"Collection {i}", padx=10, pady=10, font=("Arial", 14, "bold"))
-        col_frame.pack(padx=10, pady=10, fill=tk.X)
-        attrs_label = tk.Label(col_frame, text=f"Attributs: {', '.join(collection['hset'])}", font=("Arial", 12))
-        attrs_label.pack(anchor="w")
-        queries_label = tk.Label(col_frame, text=f"Requêtes supportées: {', '.join(map(str, collection['queries']))}", font=("Arial", 12))
-        queries_label.pack(anchor="w")
 
     canvas.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
-def display_schema_in_new_window(schema, silhouette_scores, best_k):
-    new_window = tk.Toplevel(root)
-    new_window.title("Résultat du Schéma NoSQL")
-    new_window.geometry("900x600")
-    display_schema(schema, silhouette_scores, best_k, new_window)
+    global canvas_frame
+    canvas_frame = tk.Frame(canvas)
+    canvas.create_window((0, 0), window=canvas_frame, anchor='nw')
 
-# Fenêtre principale pour démarrer
-root = tk.Tk()
-root.title("AI3D - Schéma NoSQL Guidé par IA")
-root.geometry("600x300")
+    canvas_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
-btn_start = tk.Button(root, text="Commencer la Conception", command=launch_entity_window, font=("Arial", 14, "bold"))
-btn_start.pack(expand=True)
+    root.mainloop()
 
-root.mainloop()
+
+def show_output_window(Q):
+    score, best_k, scores = optimalSchema(Q)
+    clusters = kmeans(Q, best_k)
+
+    win = Toplevel()
+    win.title("KDNApp - Output")
+
+    # Main container (2 columns: left = scores, right = schema)
+    main_frame = tk.Frame(win)
+    main_frame.pack(padx=10, pady=10, fill='both', expand=True)
+
+    # LEFT: silhouette scores for each k
+    score_frame = tk.Frame(main_frame)
+    score_frame.pack(side='left', fill='y', padx=(0, 20))
+
+    tk.Label(score_frame, text="Silhouette Scores by k", font=('Arial', 12, 'bold')).pack(anchor='w', pady=(0, 10))
+
+    for k in sorted(scores):
+        color = 'green' if k == best_k else 'black'
+        label = tk.Label(score_frame, text=f"k = {k} → score = {scores[k]:.4f}", fg=color)
+        label.pack(anchor='w')
+
+    # RIGHT: result of clustering (scrollable)
+    result_frame = tk.Frame(main_frame)
+    result_frame.pack(side='left', fill='both', expand=True)
+
+    tk.Label(result_frame, text="Optimal Clustering Result", font=('Arial', 12, 'bold')).pack(anchor='w', pady=(0, 10))
+
+    result_text = scrolledtext.ScrolledText(result_frame, height=25, width=90)
+    result_text.pack(fill='both', expand=True)
+
+    for cid, data in clusters.items():
+        result_text.insert(tk.END, f"Collection {cid}:\n")
+        result_text.insert(tk.END, f"  Queries supported: {data['queries']}\n")
+        result_text.insert(tk.END, f"  Attributes: {data['hset']}\n\n")
+
+    result_text.config(state=tk.DISABLED)
+
+# === Launch GUI ===
+create_input_window()
