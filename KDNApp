@@ -1,36 +1,6 @@
 import random as rd
 import numpy as np
 import re
-query1="SELECT aircraftid,manufacturer,model,capacity,year FROM Aircraft WHERE manufacturer=%M% and year>=%y% and year<=%Y% ORDER BY year ASC;"
-
-query2="SELECT fullName,birthDate,nationality,sex FROM Passenger WHERE passport_num=%PN%;"
-
-query3="SELECT id_number,date_dep,time_dep,date_arr,time_arr,country_dep,city_dep,country_arr,city_arr,level FROM Flight WHERE company=%C% and date_dep>=%D1% and date_dep<=%D2% and level>=%l% and level<=%L%;"
-
-query4="SELECT id_number,date_dep,time_dep,date_arr,time_arr,city_dep,country_dep,city_arr,country_arr FROM Flight WHERE company=%C% and date_dep=%D%;"
-
-query5="SELECT id_number,date_dep,aircraftid,model FROM Flight INCLUDE Flight.aircraft WHERE date_dep>=%D1% and date_dep<=%D2% and company=%C%;"
-
-query6="SELECT id_number,date_dep,time_dep,date_arr,time_arr,level FROM Flight INCLUDE Flight.aircraft WHERE date_dep>=%D1% and date_dep<=%D2% and model=%M%;"
-
-query7="SELECT passport_num,fullName,birthDate,nationality,sex FROM Flight INCLUDE Flight.passengers WHERE id_number=%N%;"
-
-query8="SELECT passport_num,fullName,birthDate FROM Passenger INCLUDE Passenger.flights WHERE id_number=%N% and nationality=%NT% and sex=%Sx%;"
-
-query9="SELECT longitude,latitude,loc_date,loc_time FROM Flight INCLUDE Flight.positions WHERE id_number=%N% ORDER BY loc_date DESC,loc_time DESC;"
-
-query10="SELECT id_number,loc_date,loc_time FROM Localization INCLUDE Localization.flights WHERE longitude>=%lg1% and longitude<=%lg2% and latitude>=%lt1% and latitude<=%lt2% ORDER BY loc_date,loc_time;"
-
-query11="SELECT id_number,date_dep,time_dep,passport_num FROM Flight INCLUDE Flight.passengers WHERE  city_dep=%CT% and country_dep=%CNT% and date_dep=%DD%;"
-
-query12="SELECT id_number,date_dep,time_dep,date_arr,time_arr,nationality,fullName,passport_num FROM Flight INCLUDE Flight.passengers WHERE date_dep>=%D% ORDER BY id_number,nationality,fullName;"
-
-query13="SELECT id_number,date_dep,time_dep,passport_num,fullName,birthDate,nationality,sex FROM Flight INCLUDE Flight.passengers WHERE city_dep=%CT% and country_dep=%CNT% and date_dep=%D% ORDER BY id_number,nationality,P.passport_num;"
-
-query14="SELECT aircraftid,model,fullName,nationality,passport_num FROM Flight INCLUDE Flight.aircraft,Flight.passengers WHERE date_dep=%D% ORDER BY aircraftid,nationality,passport_num;"
-
-queries={i:eval("query"+str(i)) for i in range(1,15)}
-
 def getAttribs(query):
     query=query.replace("DESC","")
     query=query.replace("ASC","")
